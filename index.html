@@ -1,0 +1,50 @@
+<div class="container">
+  <h1>🎬 Movie Submission & Ranking</h1>
+  <p class="subtitle">Submit movies, then vote with a goofy anonymous name!</p>
+  
+  <div class="instructions">
+    <strong>Phase 1:</strong> Submit movie titles to build the list. <strong>Phase 2:</strong> Everyone votes anonymously with silly names!
+  </div>
+
+  <!-- Phase 1: Movie Submission -->
+  <div class="phase-section" id="submission-phase">
+    <h2>📝 Phase 1: Submit Movies</h2>
+    <div class="input-group">
+      <label for="movie-input">Movie Title:</label>
+      <input type="text" id="movie-input" placeholder="Enter a movie title">
+      <button onclick="addMovie()" style="margin-top: 10px;">Add Movie</button>
+    </div>
+    
+    <div id="movie-list-display"></div>
+    
+    <button onclick="switchToVoting()" id="start-voting-btn" style="background: linear-gradient(135deg, #48bb78, #38a169); font-size: 18px; padding: 15px 30px; margin-top: 20px;">
+      🗳️ Start Voting Phase
+    </button>
+  </div>
+
+  <!-- Phase 2: Voting -->
+  <div class="phase-section hidden" id="voting-phase">
+    <h2>🎭 Phase 2: Anonymous Voting</h2>
+    
+    <div class="voter-section">
+      <div class="input-group">
+        <label for="voter-name">Choose Your Anonymous Goofy Name:</label>
+        <input type="text" id="voter-name" placeholder="e.g. Captain Popcorn, Movie Ninja, Sir Snacksalot">
+        <button onclick="setVoter()" style="margin-top: 10px;">Start Voting</button>
+        <button onclick="generateGoofyName()" style="margin-top: 10px; background: #9f7aea;">Generate Random Name</button>
+      </div>
+      <div id="current-voter-display"></div>
+    </div>
+
+    <div id="voting-area">
+      <div class="no-voter-message">
+        <h3>🎭 Pick Your Goofy Name Above!</h3>
+        <p>Choose a silly anonymous name to start voting on movies.</p>
+      </div>
+    </div>
+
+    <button onclick="switchToSubmission()" style="margin-top: 20px;">← Back to Add More Movies</button>
+  </div>
+
+  <div id="results-area"></div>
+</div>
