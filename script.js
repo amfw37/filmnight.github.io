@@ -1,10 +1,15 @@
+// Google Sheets integration
+const SHEET_ID = 'YOUR_SHEET_ID_HERE'; // You'll replace this
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+const FORM_URL = `https://docs.google.com/forms/d/e/YOUR_FORM_ID_HERE/formResponse`; // We'll set this up
+
 // Movie submission and voting system
 let movieList = [];
 let currentVoter = null;
 let votes = {};
 let voterHistory = {};
 
-// Goofy name generator
+// Goofy name generator (same as before)
 const goofyNames = [
     "Captain Popcorn", "Movie Ninja", "Sir Snacksalot", "The Reel Deal", 
     "Blockbuster Betty", "Cinema Sam", "Flick Master", "Screen Queen",
@@ -16,6 +21,67 @@ const goofyNames = [
     "Marvel Fan", "DC Defender", "Star Wars Steve", "Trek Master",
     "Horror Hound", "Rom Com Rob", "Sci-Fi Sally", "Western Will"
 ];
+
+// Load data from Google Sheets when page loads
+async function loadDataFromSheet() {
+    try {
+        const response = await fetch(SHEET_URL);
+        const text = await response.text();
+        const json = JSON.parse(text.substr(47).slice(0, -2));
+        
+        movieList = [];
+        votes = {};
+        voterHistory = {};
+        
+        json.table.rows.forEach(row => {
+            const movieTitle = row.c[0]?.v;
+            const voterName = row.c[1]?.v;
+            const action = row.c[3]?.v;
+            
+            if (!movieTitle) return;
+            
+            if (action === 'submit') {
+                if (!movieList.includes(movieTitle)) {
+                    movieList.push(movieTitle);
+                    votes[movieTitle] = [];
+                    voterHistory[movieTitle] = [];
+                }
+            } else if (action === 'vote' && voterName) {
+                if (!votes[movieTitle]) {
+                    votes[movieTitle] = [];
+                    voterHistory[movieTitle] = [];
+                }
+                votes[movieTitle].push({voter: voterName, timestamp: new Date().toISOString()});
+                voterHistory[movieTitle].push(voterName);
+            }
+        });
+        
+        displayMovieList();
+        if (currentVoter) {
+            displayMovies();
+        }
+        
+    } catch (error) {
+        console.log('Could not load data from sheet:', error);
+    }
+}
+
+// Save data to Google Sheets
+function saveToSheet(movieTitle, voterName = '', action = 'submit') {
+    const formData = new FormData();
+    formData.append('entry.MOVIE_FIELD_ID', movieTitle);
+    formData.append('entry.VOTER_FIELD_ID', voterName);
+    formData.append('entry.ACTION_FIELD_ID', action);
+    
+    fetch(FORM_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+    }).then(() => {
+        // Reload data after saving
+        setTimeout(loadDataFromSheet, 1000);
+    });
+}
 
 function generateGoofyName() {
     const randomName = goofyNames[Math.floor(Math.random() * goofyNames.length)];
@@ -36,22 +102,16 @@ function addMovie() {
         return;
     }
     
-    movieList.push(movie);
-    votes[movie] = [];
-    voterHistory[movie] = [];
-    movieInput.value = '';
+    // Save to Google Sheets
+    saveToSheet(movie, '', 'submit');
     
-    displayMovieList();
+    movieInput.value = '';
 }
 
 function removeMovie(movie) {
-    const index = movieList.indexOf(movie);
-    if (index > -1) {
-        movieList.splice(index, 1);
-        delete votes[movie];
-        delete voterHistory[movie];
-        displayMovieList();
-    }
+    // For simplicity, we won't implement remove with Google Sheets
+    // You can manually delete from the sheet if needed
+    alert('To remove movies, delete the row from the Google Sheet directly');
 }
 
 function displayMovieList() {
@@ -71,7 +131,6 @@ function displayMovieList() {
         html += `
             <div class="movie-item-display">
                 <span>${movie}</span>
-                <button class="remove-btn" onclick="removeMovie('${movie}')">Remove</button>
             </div>
         `;
     });
@@ -80,6 +139,23 @@ function displayMovieList() {
     display.innerHTML = html;
 }
 
+// Rest of the functions stay the same, but update voteForMovie:
+function voteForMovie(movie) {
+    if (!currentVoter) {
+        alert('Please enter your goofy name first!');
+        return;
+    }
+
+    if (voterHistory[movie] && voterHistory[movie].includes(currentVoter)) {
+        alert('You have already voted for this movie!');
+        return;
+    }
+
+    // Save vote to Google Sheets
+    saveToSheet(movie, currentVoter, 'vote');
+}
+
+// All other functions remain exactly the same...
 function switchToVoting() {
     if (movieList.length === 0) {
         alert('Please add some movies first!');
@@ -140,8 +216,8 @@ function displayMovies() {
     `;
     
     movieList.forEach(movie => {
-        const voteCount = votes[movie].length;
-        const hasVoted = voterHistory[movie].includes(currentVoter);
+        const voteCount = votes[movie] ? votes[movie].length : 0;
+        const hasVoted = voterHistory[movie] && voterHistory[movie].includes(currentVoter);
         const votedClass = hasVoted ? 'voted' : '';
         
         html += `
@@ -161,33 +237,13 @@ function displayMovies() {
     displayResults();
 }
 
-function voteForMovie(movie) {
-    if (!currentVoter) {
-        alert('Please enter your goofy name first!');
-        return;
-    }
-
-    if (voterHistory[movie].includes(currentVoter)) {
-        alert('You have already voted for this movie!');
-        return;
-    }
-
-    votes[movie].push({
-        voter: currentVoter,
-        timestamp: new Date().toISOString()
-    });
-    
-    voterHistory[movie].push(currentVoter);
-    displayMovies();
-}
-
 function displayResults() {
     const resultsArea = document.getElementById('results-area');
     
     const sortedResults = movieList
         .map(movie => ({
             movie: movie,
-            voteCount: votes[movie].length
+            voteCount: votes[movie] ? votes[movie].length : 0
         }))
         .sort((a, b) => b.voteCount - a.voteCount)
         .filter(item => item.voteCount > 0);
@@ -205,7 +261,7 @@ function displayResults() {
     const totalVotes = sortedResults.reduce((sum, item) => sum + item.voteCount, 0);
     const uniqueVoters = new Set();
     Object.values(voterHistory).forEach(voters => {
-        voters.forEach(voter => uniqueVoters.add(voter));
+        if (voters) voters.forEach(voter => uniqueVoters.add(voter));
     });
 
     html += `<div class="vote-stats">${totalVotes} total votes from ${uniqueVoters.size} goofy voters</div>`;
@@ -257,6 +313,12 @@ function displayResults() {
 
     resultsArea.innerHTML = html;
 }
+
+// Load data when page starts
+window.addEventListener('load', loadDataFromSheet);
+
+// Refresh data every 10 seconds to see new submissions/votes
+setInterval(loadDataFromSheet, 10000);
 
 // Allow Enter key for inputs
 document.addEventListener('DOMContentLoaded', function() {
